@@ -1,0 +1,4 @@
+"STARTUP.obj",
+"zhenghe.obj" 
+TO "zhenghe" 
+RAMSIZE(256) 

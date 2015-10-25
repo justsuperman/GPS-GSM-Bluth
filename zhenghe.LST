@@ -1,0 +1,696 @@
+C51 COMPILER V9.00   ZHENGHE                                                               10/26/2015 00:28:39 PAGE 1   
+
+
+C51 COMPILER V9.00, COMPILATION OF MODULE ZHENGHE
+OBJECT MODULE PLACED IN zhenghe.OBJ
+COMPILER INVOKED BY: D:\Keil\C51\BIN\C51.EXE zhenghe.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          ///********************接线的时候注意要共地！！千万目前服务器还不接受数据*********************************
+             -********/
+   2          #include <STC12C5A60S2.h>
+   3          #include <intrins.h>
+   4          #include<string.h>
+   5          #include<stdio.h>
+   6          #define uchar unsigned char
+   7          #define uint unsigned int
+   8          uint time;         //接电话计时
+   9          //uchar code table[8]={0xf1,0xf3,0xf2,0xf6,0xf4,0xfc,0xf8,0xf9}; //反转
+  10          //uchar code table1[8]={0xf9,0xf8,0xfc,0xf4,0xf6,0xf2,0xf3,0xf1}; //正转
+  11          uint n,m;
+  12          #define Buf_Max 100 //缓存长度100
+  13          #define Delay_Time 3000  //延时长度
+  14          unsigned char i = 0;               //定义缓存指针
+  15          xdata unsigned  char Rec_Buf[Buf_Max];    //定义缓存数组
+  16          sbit beep=P3^7;
+  17          sbit LED1 = P1^0; //状态指示灯1
+  18          sbit LED2 = P1^1; //状态指示灯2
+  19          sbit LED3 = P1^2; //状态指示灯3 //这两个灯不能用，留给串口2的
+  20          sbit LED4 = P1^3; //状态指示灯4 //这两个灯不能用，留给串口2的
+  21          sbit LED5 = P1^4; //状态指示灯5
+  22          sbit LED6 = P1^5; //状态指示灯6
+  23          sbit LED7 = P1^6; //状态指示灯7
+  24          sbit LED8 = P1^7; //状态指示灯8
+  25          
+  26          void Serial_Init(void);            //声明串口初始化函数
+  27          void Send_Hex(unsigned char b);    //声明发送字符(十六进制)函数
+  28          void Send_ASCII(unsigned char *b); //声明发送字符(ASCII码)函数
+  29          void Delay_ms(unsigned int time);  //声明延时函数
+  30          void DelaySec(int sec);                    //声明延时多少秒
+  31          //void delay(uint z);                              //声明步进电机延时、、要改成上面的
+  32          void CLR_Buf(void);                                //声明清除缓存内容，以便下次继续用   
+  33          void gsmcsh(void);                                 //GSM模块的初始化，所有的都有了，就等待短信了
+  34          bit  Hand(unsigned char *a);       //声明判断缓存中是否含有指定的字符串函数
+  35          void fdx();                                                //声明发定位短信函数
+  36          void GPSWZ();                                      //声明发思恋短信函数
+  37          void ddh();                                        //声明打电话函数
+  38          void door();                               //声明开关门函数
+  39          void GPSWZ_dx();
+  40          ////////////////
+  41          #define S2_P4 0x10
+  42          #define Buf_Max2 72 //缓存长度72
+  43          xdata unsigned  char Rec_Buf2[Buf_Max2];    //定义缓存数组
+  44          unsigned  char GPSJW[28]="NO,Receive-GPS!";    //定义GPS经纬度缓存数组
+  45          uchar code temp1[94]={0xB5,0x62,0x06,0x01,0x08,0x00,0xF0,0x05,0x00,0x00,0x00,0x00,0x00,0x00,0x04,0x46,0xB5
+             -,0x62,0x06,0x01,0x08,0x00,0xF0,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x00,0x24,0xB5,0x62,0x06,0x01,0x08,0x00,0xF0,0x02,0x00
+             -,0x00,0x00,0x00,0x00,0x00,0x01,0x31,0xB5,0x62,0x06,0x01,0x08,0x00,0xF0,0x03,0x00,0x00,0x00,0x00,0x00,0x00,0x02,0x38,0xB5
+             -,0x62,0x06,0x01,0x08,0x00,0xF0,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x2A,0xB5,0x62,0x06,0x08,0x06,0x00,0x10,0x27,0x01
+             -,0x00,0x01,0x00,0x4D,0xDD};   
+  46          uchar u = 0;               //定义缓存指针
+  47          uchar f1 = 0;                      //收到70个数据的标志位
+  48          uchar f2=0;                                     //定义一个6次计数字符，这样就一分钟发一次
+  49          void Send_Hex2(unsigned char b);    //声明发送字符(十六进制)函数
+  50          void UART2_SendStr(uchar *str, uchar n); //声明发送数组，后面是数组的长度
+C51 COMPILER V9.00   ZHENGHE                                                               10/26/2015 00:28:39 PAGE 2   
+
+  51          void UartInit2(void);            //声明串口初始化函数
+  52          void GPRMC_send(void);
+  53          void clone(void);          //拷贝出想要的数据
+  54          void CLR_Buf2(void);
+  55          
+  56          
+  57          /**********************************主函数******************************/
+  58          void main(void)
+  59          {                       
+  60   1                              gsmcsh();
+  61   1                              UartInit2();//串口初始化
+  62   1                              UART2_SendStr(temp1,94);//把命令以数组的方式发送出去
+  63   1                              DelaySec(1);                                    
+  64   1                              while(1)
+  65   1                                      {       
+  66   2                                      /*********************等待接收短信********************/
+  67   2                                              if(strstr(Rec_Buf,"CMTI")!=NULL)    //若缓存字符串中含有"+CMTI"就表示有新的短信
+  68   2                                              
+  69   2                                                      {
+  70   3                                                              LED1 = 1;                                               //进来以后把第一个等点亮
+  71   3                                                              CLR_Buf();                   //清除缓存内数据，等待接收短信内容
+  72   3                                                              while(!Hand("CMGR"))
+  73   3                                                              {
+  74   4                                                                      Delay_ms(Delay_Time);        //延时
+  75   4                                                                      Send_ASCII("AT+CMGR=1");     //发送读取信息指令
+  76   4                                                              Send_Hex(0x0d);               //发送回车符
+  77   4                                                                      Send_Hex(0x0a);               //发送换行符
+  78   4                                                                      DelaySec(1);  //！！！如果这里不延时，总会发两条命令来测试，才能通过，因为缓存还没存到缓存数组里了
+  79   4                                                              }
+  80   3                                                              LED2 = 1;//当+CMGR: "REC UNREAD","15150218615","","15/05/17,20:06:44+32"
+  81   3                                                              DelaySec(1);//让短信装进缓存里
+  82   3                                                      if(strstr(Rec_Buf,"DW")!=NULL) //如果信息内容是"DW"
+  83   3                                                      {
+  84   4                                                                       LED7=1;
+  85   4                                                                       Delay_ms(Delay_Time);     //延时
+  86   4                                                                        while(!Hand("CENG"))
+  87   4                                                                        {
+  88   5                                                                                       Delay_ms(Delay_Time);     //延时
+  89   5                                                                                       Send_ASCII("AT+CENG?");  //开工程模式，读取定位信息
+  90   5                                                                                       CLR_Buf();                       //先清楚缓存数组里的东西，防止之前有所残余
+  91   5                                                                                       Delay_ms(Delay_Time);
+  92   5                                                                                       Send_Hex(0x0d);            //发送回车符
+  93   5                                                                                       Send_Hex(0x0a);                         //发送换行符
+  94   5                                                                                       DelaySec(1);
+  95   5                                                                                       DelaySec(1);          
+  96   5                                                                        }
+  97   4                                                                        LED6=1;
+  98   4                                                                        fdx();                          //我的目的是在这发短信，把定位信息发出来
+  99   4                                                                        LED5=1;                                                       
+ 100   4                                                                              CLR_Buf();                              //清除缓存内容
+ 101   4                                                                              DelaySec(1);
+ 102   4                                                                      }                               
+ 103   3                                                              
+ 104   3                                                              
+ 105   3                                                              if(strstr(Rec_Buf,"GPSWZ")!=NULL) //如果信息内容是"GPSWZ"
+ 106   3                                                      {
+ 107   4                                                                       LED7=1;
+ 108   4                                                                       Delay_ms(Delay_Time);     //延时
+ 109   4                                                                        GPSWZ_dx();
+ 110   4                                                                        LED5=1;                                                       
+ 111   4                                                                      CLR_Buf();
+ 112   4                                                                      DelaySec(1);
+C51 COMPILER V9.00   ZHENGHE                                                               10/26/2015 00:28:39 PAGE 3   
+
+ 113   4                                                                      }                          //清除缓存内容       
+ 114   3                                                              
+ 115   3                                                              door();
+ 116   3                                                              
+ 117   3                                                              while(!Hand("OK"))                    //等待设置成功
+ 118   3                                                              {
+ 119   4                                                                      Delay_ms(Delay_Time);                   //延时
+ 120   4                                                                      Send_ASCII("AT+CMGD=1,4");                //删除读取后的信息
+ 121   4                                                                      Send_Hex(0x0d);                          //发送回车符
+ 122   4                                                                      Send_Hex(0x0a);                                                  //发送换行符
+ 123   4                                                                      DelaySec(1);                          
+ 124   4                                                              }
+ 125   3                                                              CLR_Buf();                                                        //清除缓存内容
+ 126   3                                                              DelaySec(1); 
+ 127   3                                                              P1=0x4f;                       
+ 128   3                                                      } 
+ 129   2                     /******************等待接收短信结束***************************/
+ 130   2                                      
+ 131   2                                /*******************检测来电话接听****************************/
+ 132   2                                if(strstr(Rec_Buf,"CLIP")!=NULL)//当检测到来电话的时候
+ 133   2                                      {
+ 134   3                                              DelaySec(40);  //让小喇叭响40秒钟
+ 135   3                                              Send_ASCII("ATA\r\n");
+ 136   3                                              CLR_Buf();
+ 137   3                                              DelaySec(2);
+ 138   3                                              
+ 139   3                                              while(!Hand("CARRIER"))       //当检测不到对方挂断就在这等待                    
+ 140   3                                              {
+ 141   4                                                 DelaySec(60);
+ 142   4                                                 time++;
+ 143   4                                                 if(time>200)
+ 144   4                                                      {
+ 145   5                                                              time=0;
+ 146   5                                                              break;
+ 147   5                                                      }
+ 148   4                                              }//这一句过不去，跳不下来
+ 149   3                                              CLR_Buf();                //清除缓存内容
+ 150   3                                              DelaySec(1);
+ 151   3                                              Send_ASCII("ATH\r\n");
+ 152   3                                              DelaySec(5);                            //延时5秒
+ 153   3      
+ 154   3                                      }
+ 155   2                                /*******************检测来电话接听结束****************************/
+ 156   2                                door();
+ 157   2                                if(GPSJW[0]=='A')
+ 158   2                                {
+ 159   3                                      GPSWZ();
+ 160   3                                }
+ 161   2                              }
+ 162   1      }
+ 163          
+ 164          /***************************串口初始化函数*****************************/
+ 165          /*函数原型:void Serial_Init(void)
+ 166          /*函数功能:串口初始化
+ 167          /*输入参数:无
+ 168          /*输出参数:无
+ 169          /**********************************************************************/
+ 170          void Serial_Init(void)//波特率产生器
+ 171          {
+ 172   1              SCON = 0x50;            //8位数据,可变波特率
+ 173   1              AUXR |= 0x40;           //定时器1时钟为Fosc,即1T
+ 174   1              AUXR &= 0xFE;           //串口1选择定时器1为波特率发生器
+C51 COMPILER V9.00   ZHENGHE                                                               10/26/2015 00:28:39 PAGE 4   
+
+ 175   1              TMOD &= 0x0F;           //清除定时器1模式位
+ 176   1              TMOD |= 0x20;           //设定定时器1为8位自动重装方式
+ 177   1              TL1 = 0xDC;             //设定定时初值
+ 178   1              TH1 = 0xDC;             //设定定时器重装值
+ 179   1              TR1 = 1;                //启动定时器1
+ 180   1              ES=1;
+ 181   1              EA=1;
+ 182   1      }
+ 183          
+ 184          /****************************串口中断处理函数**************************/
+ 185          /*函数原型:void Serial_Int1(void)
+ 186          /*函数功能:串口中断处理
+ 187          /*输入参数:无
+ 188          /*输出参数:无
+ 189          /**********************************************************************/
+ 190          void Serial_Int1() interrupt 4 
+ 191          {       
+ 192   1              ES = 0;  //关串口中断，防止中断嵌套
+ 193   1              if(TI)   //如果是发送中断，则不做任何处理
+ 194   1                      {
+ 195   2                              TI = 0;  //清除发送中断标志位
+ 196   2                      }
+ 197   1              if(RI)   //如果是接送中断，则进行处理
+ 198   1                      {
+ 199   2                              RI = 0; //清除接收中断标志位
+ 200   2                              Rec_Buf[i] = SBUF; //将接收到的字符串存到缓存中
+ 201   2                              i++;               //缓存指针向后移动
+ 202   2                              if(i>Buf_Max-1)          //如果缓存满,将缓存指针指向缓存的首地址
+ 203   2                                      {
+ 204   3                                              i=Buf_Max-1;
+ 205   3                                              //REN=1;//不让再接收了，除非在清除数组里清除
+ 206   3                                      }
+ 207   2                      }
+ 208   1              ES = 1;  //开启串口中断
+ 209   1      }
+ 210          /****************************GSM模块初始化函数***********************/
+ 211          /*函数原型:void gsmcsh(void)
+ 212          /*函数功能:把所有的初始化都包括在这里了，就等着接收短信了
+ 213          /*输入参数:无
+ 214          /*输出参数:无
+ 215          /**********************************************************************/
+ 216          void gsmcsh(void)
+ 217          {
+ 218   1                      Serial_Init();         //初始化串口
+ 219   1                              DelaySec(4);              //延时四秒，发现正好可以启动
+ 220   1                              CLR_Buf();             //清除缓存内容
+ 221   1                      DelaySec(1);            //延时1秒
+ 222   1                      while(!Hand("OK"))     //判断是否握手成功,如果不成功延时一会,再发送AT握手指令
+ 223   1                                      {
+ 224   2                                              Send_ASCII("AT"); //发送联机指令 
+ 225   2                              Send_Hex(0x0d);    //发送回车符    
+ 226   2                                              Send_Hex(0x0a);    //发送换行符
+ 227   2                                              P1=0x1c;
+ 228   2                                              DelaySec(1);   //延时
+ 229   2                                      }
+ 230   1                              DelaySec(1);                       //延时一会
+ 231   1                              CLR_Buf();                //清除缓存内容
+ 232   1                              P1 = 0x4e;                 //点亮握手成功指示灯
+ 233   1      
+ 234   1                      ////////////////////////////////////
+ 235   1                       DelaySec(1);                           //延时
+ 236   1                              while(!Hand("OK"))       //等待设置成功
+C51 COMPILER V9.00   ZHENGHE                                                               10/26/2015 00:28:39 PAGE 5   
+
+ 237   1                              {
+ 238   2                                      Delay_ms(Delay_Time);     //延时
+ 239   2                                      Send_ASCII("AT+CIPSHUT");//     关闭移动场景
+ 240   2                                      Send_Hex(0x0d);            //发送回车符
+ 241   2                                      Send_Hex(0x0a);            //发送换行符
+ 242   2                                      DelaySec(1);
+ 243   2                              }
+ 244   1                              DelaySec(1);
+ 245   1                              CLR_Buf();                //清除缓存内容
+ 246   1                              //LED4=1;
+ 247   1      
+ 248   1                              DelaySec(1);                            //延时
+ 249   1                              while(!Hand("OK"))       //等待设置成功
+ 250   1                              {
+ 251   2                                      Delay_ms(Delay_Time);     //延时
+ 252   2                                      Send_ASCII("AT+CIPMUX=0");//
+ 253   2                                      Send_Hex(0x0d);            //发送回车符
+ 254   2                                      Send_Hex(0x0a);            //发送换行符
+ 255   2                                      DelaySec(1);
+ 256   2                              }
+ 257   1                              DelaySec(1);
+ 258   1                              CLR_Buf();                //清除缓存内容
+ 259   1                              LED5=1;
+ 260   1      
+ 261   1                              DelaySec(1);                            //延时
+ 262   1                              while(!Hand("OK"))       //等待设置成功
+ 263   1                              {
+ 264   2                                      Delay_ms(Delay_Time);     //延时
+ 265   2                                      Send_ASCII("AT+CIPRXGET=0");//
+ 266   2                                      Send_Hex(0x0d);            //发送回车符
+ 267   2                                      Send_Hex(0x0a);            //发送换行符
+ 268   2                                      DelaySec(1);
+ 269   2                              }
+ 270   1                              DelaySec(1);
+ 271   1                              CLR_Buf();                //清除缓存内容
+ 272   1                              LED5=0;
+ 273   1      
+ 274   1                              DelaySec(1);                            //延时
+ 275   1                              while(!Hand("OK"))       //等待设置成功
+ 276   1                              {
+ 277   2                                      Delay_ms(Delay_Time);     //延时
+ 278   2                                      Send_ASCII("AT+CIPQRCLOSE=1");//
+ 279   2                                      Send_Hex(0x0d);            //发送回车符
+ 280   2                                      Send_Hex(0x0a);            //发送换行符
+ 281   2                                      DelaySec(1);
+ 282   2                              }
+ 283   1                              DelaySec(1);
+ 284   1                              CLR_Buf();                //清除缓存内容
+ 285   1                              LED6=1;
+ 286   1      
+ 287   1      
+ 288   1                              DelaySec(1);                            //延时
+ 289   1                              while(!Hand("OK"))       //等待设置成功
+ 290   1                              {
+ 291   2                                      Delay_ms(Delay_Time);     //延时
+ 292   2                                      Send_ASCII("AT+CIPMODE=0");//
+ 293   2                                      Send_Hex(0x0d);            //发送回车符
+ 294   2                                      Send_Hex(0x0a);            //发送换行符
+ 295   2                                      DelaySec(1);
+ 296   2                              }
+ 297   1                              DelaySec(1);
+ 298   1                              CLR_Buf();                //清除缓存内容
+C51 COMPILER V9.00   ZHENGHE                                                               10/26/2015 00:28:39 PAGE 6   
+
+ 299   1                              LED7=0;
+ 300   1      
+ 301   1                              DelaySec(1);                            //延时
+ 302   1                              while(!Hand("ALREADY"))       //等待设置成功
+ 303   1                              {
+ 304   2                                      Delay_ms(Delay_Time);     //延时
+ 305   2                                      Send_ASCII("AT+CIPSTART=\"UDP\",\"128.199.225.127\",8080");//
+ 306   2                                      Send_Hex(0x0d);            //发送回车符
+ 307   2                                      Send_Hex(0x0a);            //发送换行符
+ 308   2                                      CLR_Buf();
+ 309   2                                      DelaySec(1);
+ 310   2                              }
+ 311   1                              DelaySec(1);
+ 312   1                              CLR_Buf();                //清除缓存内容
+ 313   1                              LED7=1;
+ 314   1      
+ 315   1                         ///////////////////////
+ 316   1                         DelaySec(1);                         //延时
+ 317   1                              while(!Hand("OK"))       //等待设置成功
+ 318   1                              {
+ 319   2                                      Delay_ms(Delay_Time);     //延时
+ 320   2                                      Send_ASCII("AT+COLP=1");//开启被叫号码显示
+ 321   2                                      Send_Hex(0x0d);            //发送回车符
+ 322   2                                      Send_Hex(0x0a);            //发送换行符
+ 323   2                                      DelaySec(1);
+ 324   2                              }
+ 325   1                              DelaySec(1);
+ 326   1                              CLR_Buf();                //清除缓存内容
+ 327   1                              LED1 = 0;                 //点亮设置成功指示灯 
+ 328   1      
+ 329   1                              DelaySec(1);                            //延时
+ 330   1                              while(!Hand("OK"))       //等待设置成功
+ 331   1                              {
+ 332   2                                      Delay_ms(Delay_Time);     //延时
+ 333   2                                      Send_ASCII("AT+CSCS=\"GSM\"");//设置GSM字符集
+ 334   2                                      Send_Hex(0x0d);            //发送回车符
+ 335   2                                      Send_Hex(0x0a);            //发送换行符
+ 336   2                                      DelaySec(1);
+ 337   2                              }
+ 338   1                              DelaySec(1);
+ 339   1                              CLR_Buf();                //清除缓存内容
+ 340   1                              LED1 = 0;                 //点亮设置成功指示灯
+ 341   1                              
+ 342   1                              DelaySec(1);
+ 343   1                              while(!Hand("OK"))       //等待设置成功
+ 344   1                              {
+ 345   2                                      Delay_ms(Delay_Time);     //延时
+ 346   2                                      Send_ASCII("AT+CNMI=2,1");//设置当有新短信到来时提示 
+ 347   2                                      Send_Hex(0x0d);            //发送回车符
+ 348   2                                      Send_Hex(0x0a);            //发送换行符
+ 349   2                                      DelaySec(1);
+ 350   2                              }
+ 351   1                              DelaySec(1);
+ 352   1                              CLR_Buf();                //清除缓存内容
+ 353   1                              LED2 = 0;                 //点亮设置成功指示灯
+ 354   1                      
+ 355   1                              DelaySec(1);
+ 356   1                              while(!Hand("OK"))            //等待设置成功
+ 357   1                              {
+ 358   2                                      Delay_ms(Delay_Time);     //延时
+ 359   2                                      Send_ASCII("AT+CMGF=1");  //文本(TEXT)模式 
+ 360   2                                      Send_Hex(0x0d);            //发送回车符
+C51 COMPILER V9.00   ZHENGHE                                                               10/26/2015 00:28:39 PAGE 7   
+
+ 361   2                                      Send_Hex(0x0a);            //发送换行符
+ 362   2                                      DelaySec(1);
+ 363   2                              }
+ 364   1                              DelaySec(1);                             //延时
+ 365   1                              CLR_Buf();                //清除缓存内容
+ 366   1                              
+ 367   1      
+ 368   1                              DelaySec(1);                    //延时
+ 369   1                              while(!Hand("OK"))     //判断是否握手成功,如果不成功延时一会,再发送指令
+ 370   1                                      {                                       //      不能是O，因为ERROR也有O
+ 371   2                                              DelaySec(3); 
+ 372   2                                              Send_ASCII("AT+CMGD=1,4");  //删除所有信息
+ 373   2                                              Send_Hex(0x0d);            //发送回车符
+ 374   2                                              Send_Hex(0x0a);            //发送换行符
+ 375   2                                              DelaySec(1);                            //延时
+ 376   2                                      }
+ 377   1                              DelaySec(1);
+ 378   1                              CLR_Buf();                //清除缓存内容
+ 379   1                              
+ 380   1      
+ 381   1                              DelaySec(1);
+ 382   1                              while(!Hand("OK"))            //等待设置成功
+ 383   1                              {
+ 384   2                                      Send_ASCII("AT+CENG=1,1");  //开启工程模式
+ 385   2                                      Send_Hex(0x0d);            //发送回车符
+ 386   2                                      Send_Hex(0x0a);            //发送换行符
+ 387   2                                      DelaySec(1);                            //延时
+ 388   2                              }
+ 389   1                              Delay_ms(Delay_Time);     //延时
+ 390   1                              CLR_Buf();                //清除缓存内容
+ 391   1                              LED5=0;                 //点亮设置成功指示灯    
+ 392   1      }
+ 393          
+ 394          /*************************发送字符(十六进制)函数********************/
+ 395          /*函数原型:void Send_Hex(unsigned char c)
+ 396          /*函数功能:发送字符(十六进制)
+ 397          /*输入参数:unsigned char c
+ 398          /******************************************************************/ 
+ 399          void Send_Hex(unsigned char c)         
+ 400          {
+ 401   1          ES = 0;               //关串口中断
+ 402   1          SBUF = c;
+ 403   1          while(TI!=1);         //等待发送完成
+ 404   1          TI = 0;               //清除发送中断标志位
+ 405   1              ES = 1;               //开串口中断
+ 406   1      }/****************************发送字符(ASCII)函数***********************/
+ 407          /*函数原型:void Send_ASCII(unsigned char *b) 
+ 408          /*函数功能:发送字符(ASCII码)
+ 409          /*输入参数:unsigned char *b
+ 410          /**********************************************************************/
+ 411          void Send_ASCII(unsigned char *b)         
+ 412          {
+ 413   1          ES = 0;                   //关串口中断
+ 414   1          for (b; *b!='\0';b++)
+ 415   1              {
+ 416   2                      SBUF = *b;
+ 417   2                      while(TI!=1);     //等待发送完成
+ 418   2                              TI = 0;           //清除发送中断标志位
+ 419   2                      }          
+ 420   1              ES = 1;                   //开串口中断
+ 421   1      }
+ 422          /**************************清除缓存数据函数****************************/
+C51 COMPILER V9.00   ZHENGHE                                                               10/26/2015 00:28:39 PAGE 8   
+
+ 423          /*函数原型:void CLR_Buf(void)
+ 424          /*函数功能:清除缓存数据
+ 425          /**********************************************************************/
+ 426          void CLR_Buf(void)
+ 427          {
+ 428   1              unsigned char k;
+ 429   1              ES = 0;
+ 430   1          for(k=0;k<Buf_Max;k++)    //将缓存内容清零
+ 431   1                  {
+ 432   2                              Rec_Buf[k] = 0;
+ 433   2                      }
+ 434   1          i = 0;                    //接收字符串的起始存储位置
+ 435   1              //REN=0;
+ 436   1              ES = 1;
+ 437   1      }
+ 438          /*****************判断缓存中是否含有指定的字符串函数******************/
+ 439          bit Hand(unsigned char *a)
+ 440          { 
+ 441   1          if(strstr(Rec_Buf,a)!=NULL)
+ 442   1                  return 1;
+ 443   1              else
+ 444   1                      return 0;
+ 445   1      }
+ 446          /*************延时N秒的函数********************/
+ 447          void DelaySec(int sec)
+ 448          {
+ 449   1              uint i , j= 0;
+ 450   1      
+ 451   1              for(i=0; i<sec; i++)
+ 452   1              {
+ 453   2                      for(j=0; j<65535; j++)
+ 454   2                      {       
+ 455   3                      }
+ 456   2              }
+ 457   1      }
+ 458          /****************************time ms延时函数***************************/
+ 459          void Delay_ms(unsigned int time)
+ 460          {
+ 461   1       unsigned char j;
+ 462   1       for(;time>0;time--)
+ 463   1              {
+ 464   2                      j = 1500;
+ 465   2                      while(j--);
+ 466   2              }
+ 467   1      }
+ 468          /*void delay(uint z)
+ 469          {                           
+ 470                  uchar x,y;
+ 471                  for(x=z;x>0;x--)
+ 472                          for(y=120;y>0;y--);
+ 473          }*/
+ 474          void fdx()//发定位短信
+ 475          {
+ 476   1              
+ 477   1                      Send_ASCII("AT+CMGS=\"15950973151\"\r\n");//此处修改为对方的电话号
+ 478   1                      DelaySec(2);//延时3秒
+ 479   1                      Send_ASCII(Rec_Buf);//修改短信内容
+ 480   1                      DelaySec(1); 
+ 481   1                      Send_Hex(0x1a);
+ 482   1              
+ 483   1                      DelaySec(10);//延时15秒
+ 484   1      }
+C51 COMPILER V9.00   ZHENGHE                                                               10/26/2015 00:28:39 PAGE 9   
+
+ 485          void GPSWZ_dx()//发GPS数据
+ 486          {
+ 487   1              
+ 488   1                      Send_ASCII("AT+CMGS=\"15950973151\"\r\n");//此处修改为对方的电话号
+ 489   1                      DelaySec(2);//延时3秒
+ 490   1                      Send_ASCII(GPSJW);//修改短信内容 //这里以后改成GPS的数组
+ 491   1                      DelaySec(1); 
+ 492   1                      Send_Hex(0x1a);
+ 493   1              
+ 494   1                      DelaySec(10);//延时15秒
+ 495   1      }
+ 496          
+ 497          void GPSWZ()//发GPS数据
+ 498          {
+ 499   1              
+ 500   1                      Send_ASCII("AT+CIPSEND");//
+ 501   1                      DelaySec(2);//延时3秒
+ 502   1                      Send_ASCII(GPSJW);//修改短信内容 //这里以后改成GPS的数组
+ 503   1                      DelaySec(1); 
+ 504   1                      Send_Hex(0x1a);
+ 505   1              
+ 506   1                      DelaySec(10);//延时15秒
+ 507   1      }
+ 508          void door()
+ 509          {
+ 510   1               if(strstr(Rec_Buf,"OPENDOOR")!=NULL) 
+ 511   1                 {
+ 512   2              beep=0; //收到字符1,开锁，蜂鸣器响两声
+ 513   2                      DelaySec(2);
+ 514   2                      beep=1; //收到字符1,开锁，蜂鸣器响两声
+ 515   2                      DelaySec(2);
+ 516   2                      beep=0;
+ 517   2                      DelaySec(2);
+ 518   2                      beep=1;
+ 519   2                      CLR_Buf();
+ 520   2                      }         
+ 521   1                if(strstr(Rec_Buf,"CLOSEDOOR")!=NULL)
+ 522   1                {
+ 523   2                              beep=0; //收到字符1,开锁，蜂鸣器响两声
+ 524   2                              DelaySec(4);
+ 525   2                              beep=1;
+ 526   2                              CLR_Buf();
+ 527   2                }     
+ 528   1      }
+ 529                                  
+ 530          /*void door()
+ 531          {
+ 532                   if(strstr(Rec_Buf,"OPENDOOR")!=NULL) 
+ 533                                     {
+ 534                                  while(n<500)
+ 535                                                  { 
+ 536                                                           for (m=0; m<8; m++)       //一个周期转30度
+ 537                                                          {
+ 538                                                                  P1 = table[m];  //取数据
+ 539                                                                  delay(50);                   //调节转速，时间不能为5，要不时间太快，反应不过来
+ 540                                                          }
+ 541                                                          n++;
+ 542                                                  }
+ 543                                          n=0;
+ 544                                          CLR_Buf();
+ 545                                          }         
+ 546                    if(strstr(Rec_Buf,"CLOSEDOOR")!=NULL)
+C51 COMPILER V9.00   ZHENGHE                                                               10/26/2015 00:28:39 PAGE 10  
+
+ 547                    {
+ 548                           while(n<500)
+ 549                                  { 
+ 550                                           for (m=0; m<8; m++)       //一个周期转30度
+ 551                                          {
+ 552                                                  P1 = table1[m];  //取数据
+ 553                                                  delay(50);                   //调节转速，时间不能为5，要不时间太快，反应不过来
+ 554                                          }
+ 555                                          n++;
+ 556                                  }
+ 557                          n=0;
+ 558                          CLR_Buf();
+ 559                    }     
+ 560          }*/
+ 561          ////////////////////////////////////////////////////////////////////////
+ 562          void UartInit2(void)            //9600bps@11.0592MHz
+ 563          {
+ 564   1              AUXR &= 0xF7;           //波特率不倍速
+ 565   1              S2CON = 0x50;           //8位数据,可变波特率
+ 566   1              AUXR |= 0x04;           //独立波特率发生器时钟为Fosc,即1T
+ 567   1              BRT = 0xDC;             //设定独立波特率发生器重装值
+ 568   1              AUXR |= 0x10;           //启动独立波特率发生器
+ 569   1          IE2 =0x01;  //开串口2中断  ES2=1
+ 570   1          EA = 1;
+ 571   1              
+ 572   1      }
+ 573          void Serial_Int2() interrupt 8 
+ 574          {       
+ 575   1              unsigned char k = 0;
+ 576   1              k = S2CON ;
+ 577   1              k = k & 0x01;
+ 578   1               if(k==1)
+ 579   1               {
+ 580   2                      S2CON = S2CON & 0xFE; //1111,1110
+ 581   2                      k = S2BUF;
+ 582   2                      Rec_Buf2[u] = k;
+ 583   2                      if(k=='$'){u=0;}
+ 584   2                      u++;               //缓存指针向后移动
+ 585   2                      if(u>Buf_Max2-10)          //如果缓存满,将缓存指针指向缓存的首地址
+ 586   2                              {
+ 587   3                                      GPRMC_send();
+ 588   3                              }
+ 589   2               }      
+ 590   1               else
+ 591   1               {
+ 592   2              S2CON = S2CON & 0xFD; //1111,1101
+ 593   2               }
+ 594   1      }
+ 595          
+ 596          void GPRMC_send()
+ 597          {
+ 598   1               // S2CON=0x40;//不允许串口接收了
+ 599   1                if(strstr(Rec_Buf2,",E,")!=NULL)
+ 600   1                {
+ 601   2                      if((strstr(Rec_Buf2,"GPRMC")!=NULL))
+ 602   2                      {
+ 603   3                              //UART2_SendStr(Rec_Buf2,u);
+ 604   3                              clone();
+ 605   3                              //UART2_SendStr(GPSJW,28);
+ 606   3                              u=0;
+ 607   3                      }
+ 608   2                }                     
+C51 COMPILER V9.00   ZHENGHE                                                               10/26/2015 00:28:39 PAGE 11  
+
+ 609   1      }
+ 610          void Send_Hex2(unsigned char c)         
+ 611          {
+ 612   1          unsigned char temp = 0;
+ 613   1              IE2 =0x00;                          //关串口中断
+ 614   1              S2CON = S2CON & 0xFD; //B'11111101, 清零串口 2 发送完成中断请求标志
+ 615   1          S2BUF = c;
+ 616   1          do
+ 617   1              {
+ 618   2              temp = S2CON;
+ 619   2              temp = temp & 0x02;
+ 620   2              }while(temp==0);                                                                                
+ 621   1          S2CON = S2CON & 0xFD; //B'11111101, 清零串口 2 发送完成中断请求标志
+ 622   1              IE2 =0x01;       //开启串口中断
+ 623   1      }
+ 624          
+ 625          void UART2_SendStr(uchar *str,unsigned char n)   
+ 626          {   
+ 627   1              unsigned char i;
+ 628   1              for(i=0;i<n;i++)
+ 629   1              {
+ 630   2              Send_Hex2(str[i]);      
+ 631   2              }   
+ 632   1      }
+ 633           
+ 634          void clone()
+ 635          {
+ 636   1              uchar i,j,k;
+ 637   1              for(i=0;i<22;i++)
+ 638   1              {
+ 639   2                      if(Rec_Buf2[i]=='A')
+ 640   2                      {j=i;}
+ 641   2              }
+ 642   1              i=j;
+ 643   1              for(k=0;k<28;k++)
+ 644   1              {
+ 645   2                      GPSJW[k]=Rec_Buf2[i];
+ 646   2                      i++;
+ 647   2              }
+ 648   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1709    ----
+   CONSTANT SIZE    =    417    ----
+   XDATA SIZE       =    172    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     38      10
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,20 @@
+<html>
+<body>
+<pre>
+<h1>µVision Build Log</h1>
+<h2>Project:</h2>
+C:\Users\Administrator\Desktop\GPS+GSM+Bluth\zhenghe.uvproj
+Project File Date:  10/25/2015
+
+<h2>Output:</h2>
+Build target 'Ä¿±ê 1'
+assembling STARTUP.A51...
+compiling zhenghe.c...
+linking...
+*** WARNING L15: MULTIPLE CALL TO SEGMENT
+    SEGMENT: ?PR?_STRSTR?STRSTR
+    CALLER1: ?C_C51STARTUP
+    CALLER2: ?PR?SERIAL_INT2?ZHENGHE
+Program Size: data=74.0 xdata=172 code=2540
+creating hex file from "zhenghe"...
+"zhenghe" - 0 Error(s), 1 Warning(s).
